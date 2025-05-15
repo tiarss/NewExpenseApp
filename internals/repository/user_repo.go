@@ -62,3 +62,11 @@ func (r *UserRepository) DeleteUserRepo(id uuid.UUID) error {
 	}
 	return nil
 }
+
+func (r *UserRepository) GetUserByEmailRepo(email string) (*models.User, error) {
+	var user *models.User
+	if err := r.db.Where(&models.User{Email: email}).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return user, nil
+}
