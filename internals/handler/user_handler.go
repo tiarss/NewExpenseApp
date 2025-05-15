@@ -219,23 +219,91 @@ func (h *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	usersResponse := UserResponse{
 		Message: "Success",
 		Data:    userData,
-		Status:  http.StatusOK,
+		Status:  http.StatusCreated,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(usersResponse)
 }
 
-// func (h *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
-// 	id := mux.Vars(r)["id"]
-// 	if id == "" || id == "undefined" {
-// 		var errorResponse ErrorResponse = ErrorResponse{
-// 			Message: "ID is required",
-// 			Status:  http.StatusBadRequest,
-// 		}
+func (h *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
 
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		json.NewEncoder(w).Encode(errorResponse)
-// 		return
-// 	}
-// }
+	if id == "" || id == "undefined" {
+		var errorResponse ErrorResponse = ErrorResponse{
+			Message: "ID is required",
+			Status:  http.StatusBadRequest,
+		}
+
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	var userRequest struct {
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&userRequest)
+	if err != nil {
+		var errorResponse ErrorResponse = ErrorResponse{
+			Message: "Invalid request body",
+			Status:  http.StatusBadRequest,
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	newId := uuid.MustParse(id)
+	user, err := h.UserService.GetUserByIDService(newId)
+	if err != nil {
+		var errorResponse ErrorResponse = ErrorResponse{
+			Message: err.Error(),
+			Status:  http.StatusInternalServerError,
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	if userRequest.Name != "" {
+		user.Name = userRequest.Name
+	}
+
+	if userRequest.Email != "" {
+		user.Email = userRequest.Email
+	}
+
+	user.UpdatedAt = time.Now()
+	user.ID = newId
+
+	updatedUser, err := h.UserService.UpdateUserService(user)
+	if err != nil {
+		var errorResponse ErrorResponse = ErrorResponse{
+			Message: err.Error(),
+			Status:  http.StatusInternalServerError,
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	userData := UserData{
+		ID:        updatedUser.ID.String(),
+		Name:      updatedUser.Name,
+		Email:     updatedUser.Email,
+		CreatedAt: updatedUser.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: updatedUser.UpdatedAt.Format(time.RFC3339),
+	}
+
+	usersResponse := UserResponse{
+		Message: "Success",
+		Data:    userData,
+		Status:  http.StatusOK,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(usersResponse)
+}

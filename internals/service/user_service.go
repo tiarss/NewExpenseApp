@@ -60,4 +60,15 @@ func (s *UserService) CreateUserService(user *models.User) (*models.User, error)
 	return s.repo.CreateUserRepo(user)
 }
 
+func (s *UserService) UpdateUserService(user *models.User) (*models.User, error) {
+
+	emailExists, _ := s.repo.GetUserByEmailRepo(user.Email)
+
+	if emailExists != nil && emailExists.ID != user.ID {
+		return nil, errors.New("email already exists")
+	}
+
+	return s.repo.UpdateUserRepo(user)
+}
+
 // change to validation user

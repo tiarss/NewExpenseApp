@@ -50,7 +50,7 @@ func (r *UserRepository) GetUserByIDRepo(id uuid.UUID) (*models.User, error) {
 }
 
 func (r *UserRepository) UpdateUserRepo(user *models.User) (*models.User, error) {
-	if err := r.db.Save(&user).Error; err != nil {
+	if err := r.db.Save(user).Error; err != nil {
 		return nil, err
 	}
 	return user, nil
