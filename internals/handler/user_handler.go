@@ -307,3 +307,36 @@ func (h *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(usersResponse)
 }
+
+func (h *UserHandler) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	if id == "" || id == "undefined" {
+		var errorResponse ErrorResponse = ErrorResponse{
+			Message: "ID is required",
+			Status:  http.StatusBadRequest,
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	newId := uuid.MustParse(id)
+	err := h.UserService.DeleteUserService(newId)
+	if err != nil {
+		var errorResponse ErrorResponse = ErrorResponse{
+			Message: err.Error(),
+			Status:  http.StatusInternalServerError,
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	usersResponse := UserResponse{
+		Message: "Success",
+		Status:  http.StatusOK,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(usersResponse)
+}

@@ -71,4 +71,13 @@ func (s *UserService) UpdateUserService(user *models.User) (*models.User, error)
 	return s.repo.UpdateUserRepo(user)
 }
 
+func (s *UserService) DeleteUserService(id uuid.UUID) error {
+	userExists, _ := s.repo.GetUserByIDRepo(id)
+	if userExists == nil {
+		return errors.New("user not found")
+	}
+
+	return s.repo.DeleteUserRepo(id)
+}
+
 // change to validation user

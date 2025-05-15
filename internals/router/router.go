@@ -22,6 +22,7 @@ func SetupRoutes(container *config.AppContainer) *mux.Router {
 	protectedRoutes.HandleFunc("/users/{id}", container.UserHandler.GetUserHandler).Methods("GET")
 	protectedRoutes.HandleFunc("/users", container.UserHandler.CreateUserHandler).Methods("POST")
 	protectedRoutes.HandleFunc("/users/{id}", container.UserHandler.UpdateUserHandler).Methods("PUT")
+	protectedRoutes.HandleFunc("/users/{id}", container.UserHandler.DeleteUserHandler).Methods("DELETE")
 	// r.HandleFunc("/api/expense", container.).Methods("GET")
 
 	return r
