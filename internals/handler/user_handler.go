@@ -2,26 +2,34 @@
 package handler
 
 import (
-	"encoding/json"
-	"net/http"
-	"strings"
-
-	"backend-expense-app/internals/models"
 	"backend-expense-app/internals/service"
-	"backend-expense-app/internals/utils"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
-type DataResponse struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Token string `json:"token,omitempty"`
+type UserData struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
-type AuthResponse struct {
-	Message string       `json:"message"`
-	Data    DataResponse `json:"data"`
-	Status  int          `json:"status"`
+type UsersResponse struct {
+	Message string     `json:"message"`
+	Data    []UserData `json:"data"`
+	Status  int        `json:"status"`
+}
+
+type UserResponse struct {
+	Message string   `json:"message"`
+	Data    UserData `json:"data"`
+	Status  int      `json:"status"`
 }
 
 type UserHandler struct {
@@ -32,149 +40,98 @@ func NewUserHandler(userService service.UserService) *UserHandler {
 	return &UserHandler{UserService: userService}
 }
 
-func (h *UserHandler) LoginUserHandler(w http.ResponseWriter, r *http.Request) {
-	type LoginRequest struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
+func (h *UserHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	email := r.URL.Query().Get("email")
 
-	var loginRequest LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&loginRequest); err != nil {
-		errorResponse := struct {
-			StatusCode int    `json:"status_code"`
-			Message    string `json:"message"`
-		}{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Invalid request payload",
-		}
-
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(errorResponse)
-		return
-	}
-
-	user, err := h.UserService.Login(loginRequest.Email, loginRequest.Password)
+	users, err := h.UserService.GetUsersService(name, email)
 	if err != nil {
-		errorResponse := struct {
-			StatusCode int    `json:"status_code"`
-			Message    string `json:"message"`
-		}{
-			StatusCode: http.StatusUnauthorized,
-			Message:    "Unauthorized",
-		}
-
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(errorResponse)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	token, err := utils.GenerateJWT(user.ID, user.Email)
-	if err != nil {
-		errorResponse := struct {
-			StatusCode int    `json:"status_code"`
-			Message    string `json:"message"`
-		}{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to generate token",
-		}
+	var Data []UserData
 
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(errorResponse)
-		return
+	for _, user := range users {
+		userData := UserData{
+			ID:        user.ID.String(),
+			Name:      user.Name,
+			Email:     user.Email,
+			CreatedAt: user.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
+		}
+		Data = append(Data, userData)
 	}
 
-	response := AuthResponse{
-		Message: "Login successful",
-		Data: DataResponse{
-			ID:    user.ID.String(),
-			Name:  user.Name,
-			Email: user.Email,
-			Token: token,
-		},
-		Status: http.StatusOK,
+	usersResponse := UsersResponse{
+		Message: "Success",
+		Data:    Data,
+		Status:  http.StatusOK,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(usersResponse)
 }
 
-func (h *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
-	type RegisterRequest struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		Name     string `json:"name"`
-	}
+func (h *UserHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
 
-	var registerRequest RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&registerRequest); err != nil {
+	fmt.Println(id)
+	if id == "" {
+		var errorResponse struct {
+			StatusCode int    `json:"status"`
+			Message    string `json:"message"`
+		}
+		errorResponse.StatusCode = http.StatusBadRequest
+		errorResponse.Message = "ID is required"
 		w.WriteHeader(http.StatusBadRequest)
-		errorResponse := struct {
-			StatusCode int    `json:"status_code"`
-			Message    string `json:"message"`
-		}{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Invalid request payload",
-		}
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
-	user := &models.User{
-		Email: registerRequest.Email,
-		Name:  registerRequest.Name,
+	newId, err := uuid.Parse(id)
+	if err != nil {
+		var errorResponse struct {
+			StatusCode int    `json:"status"`
+			Message    string `json:"message"`
+		}
+		errorResponse.StatusCode = http.StatusBadRequest
+		errorResponse.Message = "Invalid UUID format"
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(errorResponse)
+		return
 	}
 
-	hashedPassword, err := user.HashPassword(registerRequest.Password)
+	user, err := h.UserService.GetUserByIDService(newId)
 	if err != nil {
+		var errorResponse struct {
+			StatusCode int    `json:"status"`
+			Message    string `json:"message"`
+		}
+		errorResponse.StatusCode = http.StatusInternalServerError
+		errorResponse.Message = "No User Found"
 		w.WriteHeader(http.StatusInternalServerError)
-		errorResponse := struct {
-			StatusCode int    `json:"status_code"`
-			Message    string `json:"message"`
-		}{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to Hash Password",
-		}
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
-	user.Password = hashedPassword
-
-	user, err = h.UserService.RegisterUser(user)
-	if err != nil {
-		var statusCode int
-
-		switch {
-		case strings.Contains(err.Error(), "already exists"):
-			statusCode = http.StatusConflict
-		default:
-			statusCode = http.StatusInternalServerError
-		}
-
-		// Create a dynamic error response
-		errorResponse := struct {
-			StatusCode int    `json:"status_code"`
-			Message    string `json:"message"`
-		}{
-			StatusCode: statusCode,
-			Message:    err.Error(),
-		}
-
-		w.WriteHeader(statusCode)
-		json.NewEncoder(w).Encode(errorResponse)
-		return
+	userData := UserData{
+		ID:        user.ID.String(),
+		Name:      user.Name,
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
 	}
 
-	response := AuthResponse{
-		Message: "Registration successful",
-		Data: DataResponse{
-			ID:    user.ID.String(),
-			Name:  user.Name,
-			Email: user.Email,
-		},
-		Status: http.StatusOK,
+	usersResponse := UserResponse{
+		Message: "Success",
+		Data:    userData,
+		Status:  http.StatusOK,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(usersResponse)
 }
