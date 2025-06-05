@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TODO: change the secret key and store it in a environment variable
 var jwtKey = []byte("your_secret_key")
 
 type JWTClaim struct {
